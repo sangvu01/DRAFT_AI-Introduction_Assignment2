@@ -1,9 +1,5 @@
-import time
 import random
-
-# =========================
-# BOARD
-# =========================
+import time
 
 def init_board():
     return [[+1, +1, +1, +1, +1],
@@ -12,233 +8,290 @@ def init_board():
             [-1,  0,  0,  0, -1],
             [-1, -1, -1, -1, -1]]
 
-def copy_board(b):
-    return [row[:] for row in b]
-
-# =========================
-# MOVE GENERATION
-# =========================
+def copy_board(board):
+    return [row[:] for row in board]
 
 def get_valid_moves(board, player):
     moves = []
     for r in range(5):
         for c in range(5):
-            if board[r][c] != player:
-                continue
+            if board[r][c] == player:
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        if dr == 0 and dc == 0:
+                            continue
 
-            for dr in (-1, 0, 1):
-                for dc in (-1, 0, 1):
-                    if dr == 0 and dc == 0:
-                        continue
+                        if (r + c) % 2 != 0 and abs(dr) == 1 and abs(dc) == 1:
+                            continue
 
-                    # cấm chéo ở ô lẻ
-                    if (r + c) % 2 != 0 and abs(dr) == 1 and abs(dc) == 1:
-                        continue
-
-                    nr, nc = r + dr, c + dc
-                    if 0 <= nr < 5 and 0 <= nc < 5 and board[nr][nc] == 0:
-                        moves.append(((r, c), (nr, nc)))
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < 5 and 0 <= nc < 5 and board[nr][nc] == 0:
+                            moves.append(((r, c), (nr, nc)))
     return moves
 
-# =========================
-# GANH (FAST ONLY)
-# =========================
 
-def apply_ganh(board, r, c):
-    p = board[r][c]
-    if p == 0:
+def apply_ganh(board, i, j):
+    player = board[i][j]
+    if not player:
         return 0
 
-    patterns = [
-        ((-1,0),(1,0)),
-        ((0,-1),(0,1)),
-        ((-1,-1),(1,1)),
-        ((1,-1),(-1,1))
+    ganhs = [
+        ((-1, 0), (1, 0)),
+        ((0, -1), (0, 1)),
+        ((-1, -1), (1, 1)),
+        ((1, -1), (-1, 1)),
     ]
 
     score = 0
 
-    for d1, d2 in patterns:
-        r1, c1 = r + d1[0], c + d1[1]
-        r2, c2 = r + d2[0], c + d2[1]
+    for d1, d2 in ganhs:
+        l1 = (i + d1[0], j + d1[1])
+        l2 = (i + d2[0], j + d2[1])
 
-        if not (0 <= r1 < 5 and 0 <= c1 < 5):
-            continue
-        if not (0 <= r2 < 5 and 0 <= c2 < 5):
+        if not (0 <= l1[0] < 5 and 0 <= l1[1] < 5 and 0 <= l2[0] < 5 and 0 <= l2[1] < 5):
             continue
 
-        if board[r1][c1] == board[r2][c2] == -p:
-            board[r1][c1] = p
-            board[r2][c2] = p
+        if board[l1[0]][l1[1]] == board[l2[0]][l2[1]] == -player:
+            board[l1[0]][l1[1]] = player
+            board[l2[0]][l2[1]] = player
             score += 1
 
     return score
 
-# =========================
-# APPLY MOVE
-# =========================
+
+def is_surrounded(board, player, r, c, visited=None):
+    if visited is None:
+        visited = set()
+
+    if board[r][c] != player:
+        return False
+
+    if (r, c) in visited:
+        return True
+
+    visited.add((r, c))
+
+    for dr in [-1, 0, 1]:
+        for dc in [-1, 0, 1]:
+            if dr == 0 and dc == 0:
+                continue
+
+            if (r + c) % 2 != 0 and abs(dr) == 1 and abs(dc) == 1:
+                continue
+
+            nr, nc = r + dr, c + dc
+
+            if 0 <= nr < 5 and 0 <= nc < 5:
+                if board[nr][nc] == 0:
+                    return False
+                if board[nr][nc] == player:
+                    if not is_surrounded(board, player, nr, nc, visited):
+                        return False
+
+    return True
+
+
+def apply_chet(board, player, r, c):
+    score = 0
+    for i in range(5):
+        for j in range(5):
+            if board[i][j] == -player and is_surrounded(board, -player, i, j):
+                board[i][j] = player
+                score += 1
+    return score
+
 
 def apply_move(board, move, player):
-    b = copy_board(board)
-    (r1, c1), (r2, c2) = move
+    new_board = copy_board(board)
+    start, end = move
 
-    b[r1][c1] = 0
-    b[r2][c2] = player
+    new_board[start[0]][start[1]] = 0
+    new_board[end[0]][end[1]] = player
 
-    gain = apply_ganh(b, r2, c2)
+    apply_ganh(new_board, end[0], end[1])
+    apply_chet(new_board, player, end[0], end[1])
 
-    return b, gain
+    return new_board
 
-# =========================
-# QUICK HEURISTIC FOR SORTING
-# =========================
 
-def quick_score(board, move, player):
-    _, gain = apply_move(board, move, player)
-    return gain
+def get_forced_moves(board, player):
+    moves = get_valid_moves(board, player)
+    ganh_moves = []
 
-# =========================
-# EVALUATION
-# =========================
+    for move in moves:
+        start, end = move
 
-def evaluate(board, player):
+        temp = copy_board(board)
+        temp[start[0]][start[1]] = 0
+        temp[end[0]][end[1]] = player
+
+        if apply_ganh(temp, end[0], end[1]) > 0:
+            ganh_moves.append(move)
+
+    return ganh_moves if ganh_moves else moves
+
+
+def evaluate_board(board, player):
+    w_material = 10
+    w_mobility = 3
+    w_position = 1
+
     my = opp = 0
-    center = {(2,2),(1,2),(3,2),(2,1),(2,3)}
-    pos = 0
+    pos = [(2,2),(1,2),(3,2),(2,1),(2,3)]
+    pos_score = 0
 
     for r in range(5):
         for c in range(5):
             if board[r][c] == player:
                 my += 1
-                if (r,c) in center:
-                    pos += 1
+                if (r,c) in pos:
+                    pos_score += 1
             elif board[r][c] == -player:
                 opp += 1
-                if (r,c) in center:
-                    pos -= 1
+                if (r,c) in pos:
+                    pos_score -= 1
 
-    return 10*(my-opp) + pos
+    my_moves = len(get_forced_moves(board, player))
+    opp_moves = len(get_forced_moves(board, -player))
 
-# =========================
-# ALPHA BETA
-# =========================
+    return (w_material * (my - opp)) + \
+           (w_mobility * (my_moves - opp_moves)) + \
+           (w_position * pos_score)
 
-def alphabeta(board, depth, alpha, beta, player, max_player, time_limit):
-    if time.time() > time_limit or depth == 0:
-        return evaluate(board, max_player)
 
-    moves = get_valid_moves(board, player)
+# ================= MINIMAX FIX =================
+
+def minimax(board, depth, alpha, beta, maximizing, player_id, time_mark):
+
+    if time.time() - time_mark > 2.85:
+        return evaluate_board(board, player_id)
+
+    if depth == 0:
+        return evaluate_board(board, player_id)
+
+    current = player_id if maximizing else -player_id
+    moves = get_forced_moves(board, current)
+
     if not moves:
-        return evaluate(board, max_player)
+        return evaluate_board(board, player_id)
 
-    # move ordering nhẹ
-    moves.sort(key=lambda m: quick_score(board, m, player), reverse=True)
-
-    if player == max_player:
-        value = float('-inf')
+    if maximizing:
+        best = float('-inf')
 
         for m in moves:
-            nb, _ = apply_move(board, m, player)
-            value = max(value, alphabeta(nb, depth-1, alpha, beta, -player, max_player, time_limit))
-            alpha = max(alpha, value)
-            if alpha >= beta:
+            nb = apply_move(board, m, current)
+            val = minimax(nb, depth-1, alpha, beta, False, player_id, time_mark)
+
+            best = max(best, val)
+            alpha = max(alpha, val)
+
+            if beta <= alpha:
                 break
 
-        return value
+        return best
 
     else:
-        value = float('inf')
+        best = float('inf')
 
         for m in moves:
-            nb, _ = apply_move(board, m, player)
-            value = min(value, alphabeta(nb, depth-1, alpha, beta, -player, max_player, time_limit))
-            beta = min(beta, value)
-            if alpha >= beta:
+            nb = apply_move(board, m, current)
+            val = minimax(nb, depth-1, alpha, beta, True, player_id, time_mark)
+
+            best = min(best, val)
+            beta = min(beta, val)
+
+            if beta <= alpha:
                 break
 
-        return value
+        return best
 
-# =========================
-# ITERATIVE DEEPENING MOVE
-# =========================
+
+# ================= MOVE FIX =================
 
 def move(board, player, remain_time):
-    moves = get_valid_moves(board, player)
+    moves = get_forced_moves(board, player)
     if not moves:
         return None
 
     best_move = moves[0]
+    best_score = float('-inf')
 
-    start = time.time()
-    time_limit = start + 2.8
+    time_mark = time.time()
 
-    for depth in range(1, 6):  # đủ cho 3s
-        if time.time() > time_limit:
+    # iterative deepening đúng cách
+    for depth in range(1, 6):
+
+        if time.time() - time_mark > 2.7:
             break
 
-        best_score = float('-inf')
         current_best = best_move
+        current_score = best_score
 
         for m in moves:
-            nb, _ = apply_move(board, m, player)
+            nb = apply_move(board, m, player)
 
-            score = alphabeta(nb, depth-1, float('-inf'), float('inf'),
-                              -player, player, time_limit)
+            val = minimax(nb, depth-1, float('-inf'), float('inf'), False, player, time_mark)
 
-            if score > best_score:
-                best_score = score
+            if val > current_score:
+                current_score = val
                 current_best = m
 
-            if time.time() > time_limit:
+            if time.time() - time_mark > 2.85:
                 break
 
         best_move = current_best
+        best_score = current_score
 
     return best_move
 
 
+# ================= GIỮ NGUYÊN =================
+
+def greedy_find(board, player, valid_moves):
+    best_move = valid_moves[0]
+    best_score = evaluate_board(apply_move(board, best_move, player), player)
+
+    for m in valid_moves[1:]:
+        score = evaluate_board(apply_move(board, m, player), player)
+        if score > best_score:
+            best_score = score
+            best_move = m
+
+    return best_move, best_score
+
+
 def random_move(board, player, remain_time):
-    valid_moves = get_valid_moves(board, player)
+    moves = get_valid_moves(board, player)
+    return random.choice(moves) if moves else None
 
-    if not valid_moves:
-        return None
-
-    random.shuffle(valid_moves)
-
-    return valid_moves[0]
-# =========================
-# TEST LOOP
-# =========================
 
 def print_board(board):
-    char = {1: 'O', -1: 'X', 0: ' '}
-
-    for row in board:
-        for p in row:
-            print(char[p], end=' ')
-        print()
+    char = {1:'O', -1:'X', 0:' '}
+    for r in board:
+        print(" ".join(char[x] for x in r))
     print()
+
 
 def fight():
     board = init_board()
-
     print_board(board)
+
     turn = 1
 
     for i in range(100):
         best_move = move(board, turn, 100) if turn == 1 else random_move(board, turn, 100)
 
-        if best_move is None:
-           break
+        if not best_move:
+            break
 
         board = apply_move(board, best_move, turn)
 
-        print(f"TURN {i+1}: {'YOU' if turn == 1 else 'ENEMY'}")
+        print(f"TURN {i+1}: {'YOU' if turn==1 else 'ENEMY'}")
         print(best_move)
         print_board(board)
-        # input()
-        time.sleep(0.1)
 
-        turn = -turn
+        time.sleep(0.1)
+        turn *= -1
+
 
 fight()
