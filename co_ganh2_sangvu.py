@@ -273,7 +273,7 @@ def move(board, player, remain_time):
 
     #     if score > best_score:
     #         best_score = score
-    #         best_move = current_move
+    #         best_move = current_move #dd
 
     #     if time.time() >= time_mark + 2.9:
     #         print("deadline reached")
