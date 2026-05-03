@@ -123,7 +123,7 @@ def apply_move(board, move, player):
     score += apply_ganh(new_board, end[0], end[1])
     score += apply_chet(new_board, player, end[0], end[1])
 
-    return new_board
+    return new_board, score
 
 def get_forced_moves(board, player):
     moves = get_valid_moves(board, player)
@@ -138,11 +138,9 @@ def get_forced_moves(board, player):
         temp_board[end[0]][end[1]] = player
 
         # check có gánh không
-        before = sum(row.count(-player) for row in board)
-        apply_ganh(temp_board, end[0], end[1])
-        after = sum(row.count(-player) for row in temp_board)
+        ganh_score = apply_ganh(temp_board, end[0], end[1])
 
-        if after < before:  # có ăn quân = có gánh
+        if ganh_score > 0:
             ganh_moves.append(move)
 
     if ganh_moves:
@@ -181,8 +179,8 @@ def evaluate_board(board, player):
                     position_score -= 1
 
     # Tính Mobility
-    my_moves = len(get_valid_moves(board, player))
-    opp_moves = len(get_valid_moves(board, -player))
+    my_moves = len(get_forced_moves(board, player))
+    opp_moves = len(get_forced_moves(board, -player))
 
     # Tổng hợp score
     score = (w_material * (my_pieces - opp_pieces)) + \
@@ -198,7 +196,7 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
     current_player = player_id if maximizing_player else -player_id
 
     valid_moves = get_forced_moves(board, current_player)
-
+    valid_moves.sort(key=lambda m: apply_move(board, m, current_player)[1], reverse=True)
     if not valid_moves:
         return evaluate_board(board, player_id)
 
@@ -209,7 +207,7 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
                 print("deadline reached")
                 return evaluate_board(board, player_id)
 
-            new_board = apply_move(board, move, current_player)
+            new_board, s = apply_move(board, move, current_player)
             eval_score = minimax(new_board, depth - 1, alpha, beta, False, player_id, time_mark)
             max_eval = max(max_eval, eval_score)
             alpha = max(alpha, eval_score)
@@ -223,8 +221,8 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
                 print("deadline reached")
                 return evaluate_board(board, player_id)
 
-            new_board = apply_move(board, move, current_player)
-            eval_score = minimax(new_board, depth - 1, alpha, beta, True, player_id, time_mark)
+            new_board, s = apply_move(board, move, current_player)
+            eval_score = minimax(new_board, depth - 1, alpha, beta, True, player_id, time_mark) + s*10
             min_eval = min(min_eval, eval_score)
             beta = min(beta, eval_score)
             if beta <= alpha:
@@ -238,11 +236,11 @@ def move(board, player, remain_time):
     """
     valid_moves = get_forced_moves(board, player)
 
-    random.shuffle(valid_moves)
+    # random.shuffle(valid_moves)
 
     if not valid_moves:
         return None
-
+    valid_moves.sort(key=lambda m: apply_move(board, m, player)[1], reverse=True)
     if len(valid_moves) == 1:
         return valid_moves[0]
 
@@ -254,31 +252,43 @@ def move(board, player, remain_time):
         best_score = greedy_best_score
         best_move = greedy_best_move
 
-    max_depth = 5
+    # max_depth = 5
 
     time_mark = time.time()
+    for depth in range(1, 10):
+        for move in valid_moves:
+            new_board, s = apply_move(board, move, player)
+            score = minimax(new_board, depth - 1, float('-inf'), float('inf'), False, player, time_mark)
+            
+            if score > best_score:
+                best_score = score
+                best_move = move
 
-    for current_move in valid_moves:
-        new_board = apply_move(board, current_move, player)
+            if time.time() >= time_mark + 2.9:
+                return best_move
+    # for current_move in valid_moves:
+    #     new_board, s = apply_move(board, current_move, player)
 
-        score = minimax(new_board, max_depth - 1, float('-inf'), float('inf'), False, player, time_mark)
+    #     score = minimax(new_board, max_depth - 1, float('-inf'), float('inf'), False, player, time_mark)
 
-        if score > best_score:
-            best_score = score
-            best_move = current_move
+    #     if score > best_score:
+    #         best_score = score
+    #         best_move = current_move
 
-        if time.time() >= time_mark + 2.9:
-            print("deadline reached")
-            break
+    #     if time.time() >= time_mark + 2.9:
+    #         print("deadline reached")
+    #         break
 
     return best_move
 
 def greedy_find(board, player, valid_moves):
-    best_score = evaluate_board(apply_move(board, valid_moves[0], player), player)
+    new_board, best_score = apply_move(board, valid_moves[0], player)
+    best_score = evaluate_board(new_board, player)
     best_move = valid_moves[0]
 
     for m in valid_moves[1:]:
-        score = evaluate_board(apply_move(board, m, player), player)
+        new_board, _ = apply_move(board, m, player)
+        score = evaluate_board(new_board, player)
 
         if score > best_score:
             best_score = score
@@ -317,7 +327,7 @@ def fight():
         if best_move is None:
            break
 
-        board = apply_move(board, best_move, turn)
+        board, s = apply_move(board, best_move, turn)
 
         print(f"TURN {i+1}: {'YOU' if turn == 1 else 'ENEMY'}")
         print(best_move)
