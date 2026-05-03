@@ -196,34 +196,49 @@ def move(board, player, remain_time):
 
     return best_move
 
+
+def random_move(board, player, remain_time):
+    valid_moves = get_valid_moves(board, player)
+
+    if not valid_moves:
+        return None
+
+    random.shuffle(valid_moves)
+
+    return valid_moves[0]
 # =========================
 # TEST LOOP
 # =========================
 
-def print_board(b):
-    m = {1:'O', -1:'X', 0:' '}
-    for r in b:
-        print(' '.join(m[x] for x in r))
+def print_board(board):
+    char = {1: 'O', -1: 'X', 0: ' '}
+
+    for row in board:
+        for p in row:
+            print(char[p], end=' ')
+        print()
     print()
 
 def fight():
-    b = init_board()
+    board = init_board()
+
+    print_board(board)
     turn = 1
 
-    print_board(b)
+    for i in range(100):
+        best_move = move(board, turn, 100) if turn == 1 else random_move(board, turn, 100)
 
-    for _ in range(100):
-        m = move(b, turn, 100)
+        if best_move is None:
+           break
 
-        if not m:
-            break
+        board = apply_move(board, best_move, turn)
 
-        b, _ = apply_move(b, m, turn)
-
-        print(turn, m)
-        print_board(b)
+        print(f"TURN {i+1}: {'YOU' if turn == 1 else 'ENEMY'}")
+        print(best_move)
+        print_board(board)
+        # input()
+        time.sleep(0.1)
 
         turn = -turn
-        time.sleep(0.05)
 
 fight()
