@@ -111,6 +111,23 @@ def apply_chet(board, player, r, c) -> int:
 
     return score
 
+def apply_move_ganh(board, move, player):
+    new_board = [row[:] for row in board]
+    start, end = move
+
+    new_board[start[0]][start[1]] = 0
+    new_board[end[0]][end[1]] = player
+
+    score = apply_ganh(new_board, end[0], end[1])  # CHỈ gánh
+
+    return new_board, score
+
+def apply_move_full(board, move, player):
+    new_board, score = apply_move_ganh(board, move, player)
+    score += apply_chet(new_board, player, move[1][0], move[1][1])
+    return new_board, score
+
+
 def apply_move(board, move, player):
     new_board = copy_board(board)
     start, end = move
@@ -196,10 +213,12 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
     current_player = player_id if maximizing_player else -player_id
 
     valid_moves = get_forced_moves(board, current_player)
-    valid_moves.sort(key=lambda m: apply_move(board, m, current_player)[1], reverse=True)
+    valid_moves.sort(key=lambda m: apply_move_ganh(board, m, current_player)[1], reverse=True)
+    
+    # new_board, s = apply_move_ganh(board, move, current_player)
     if not valid_moves:
         return evaluate_board(board, player_id)
-
+    valid_moves = valid_moves[:6]
     if maximizing_player:
         max_eval = float('-inf')
         for move in valid_moves:
@@ -207,8 +226,8 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
                 print("deadline reached")
                 return evaluate_board(board, player_id)
 
-            new_board, s = apply_move(board, move, current_player)
-            eval_score = minimax(new_board, depth - 1, alpha, beta, False, player_id, time_mark)
+            new_board, s = apply_move_ganh(board, move, current_player)
+            eval_score = minimax(new_board, depth - 1, alpha, beta, False, player_id, time_mark) + s*5
             max_eval = max(max_eval, eval_score)
             alpha = max(alpha, eval_score)
             if beta <= alpha:
@@ -221,8 +240,8 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
                 print("deadline reached")
                 return evaluate_board(board, player_id)
 
-            new_board, s = apply_move(board, move, current_player)
-            eval_score = minimax(new_board, depth - 1, alpha, beta, True, player_id, time_mark) + s*10
+            new_board, s = apply_move_ganh(board, move, current_player)
+            eval_score = minimax(new_board, depth - 1, alpha, beta, True, player_id, time_mark) + s*5
             min_eval = min(min_eval, eval_score)
             beta = min(beta, eval_score)
             if beta <= alpha:
