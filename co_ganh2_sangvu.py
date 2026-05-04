@@ -95,7 +95,7 @@ def is_surrounded(board, player, r, c, visited = None, depth = 0) -> bool:
 
                 # if board[nr][nc] == player and (nr, nc) not in visited:
                 #     visit_next.append((nr, nc))
-                if board[nr][nc] == player:
+                if board[nr][nc] == player and (nr, nc) not in visited:
                     if not is_surrounded(board, player, nr, nc, visited):
                         return False
 
@@ -106,13 +106,30 @@ def is_surrounded(board, player, r, c, visited = None, depth = 0) -> bool:
     return True
 
 def apply_chet(board, player, r, c) -> int:
+    # score = 0
+
+    # for i in range(5):
+    #     for j in range(5):
+    #         if board[i][j] == -player and is_surrounded(board, -player, i, j, set(), 0):
+    #             board[i][j] = player
+    #             score += 1
+
+    # return score
+
+
     score = 0
+    to_flip = []
 
     for i in range(5):
         for j in range(5):
-            if board[i][j] == -player and is_surrounded(board, -player, i, j, set(), 0):
-                board[i][j] = player
-                score += 1
+            if board[i][j] == -player:
+                if is_surrounded(board, -player, i, j, set()):
+                    to_flip.append((i, j))
+
+    # flip sau khi check xong
+    for i, j in to_flip:
+        board[i][j] = player
+        score += 1
 
     return score
 
