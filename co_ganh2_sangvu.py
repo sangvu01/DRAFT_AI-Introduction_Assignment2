@@ -65,16 +65,18 @@ def apply_ganh(board, i, j) -> int:
 
 def is_surrounded(board, player, r, c, visited = None, depth = 0) -> bool:
     if visited is None:
-        visited = {}
+        # visited = {}
+        visited = set()
     if player != board[r][c]:
         raise Exception("Cell has the wrong player")
 
     if (r, c) in visited:
         return True
 
-    visited[(r, c)] = True
+    # visited[(r, c)] = True
+    visited.add((r,c))
 
-    visit_next = []
+    # visit_next = []
 
     for dr in [-1, 0, 1]:
         for dc in [-1, 0, 1]:
@@ -91,12 +93,15 @@ def is_surrounded(board, player, r, c, visited = None, depth = 0) -> bool:
                 if board[nr][nc] == 0:
                     return False
 
-                if board[nr][nc] == player and (nr, nc) not in visited:
-                    visit_next.append((nr, nc))
+                # if board[nr][nc] == player and (nr, nc) not in visited:
+                #     visit_next.append((nr, nc))
+                if board[nr][nc] == player:
+                    if not is_surrounded(board, player, nr, nc, visited):
+                        return False
 
-    for (nr, nc) in visit_next:
-        if not is_surrounded(board, player, nr, nc, visited, depth+1):
-            return False
+    # for (nr, nc) in visit_next:
+    #     if not is_surrounded(board, player, nr, nc, visited, depth+1):
+    #         return False
 
     return True
 
@@ -105,7 +110,7 @@ def apply_chet(board, player, r, c) -> int:
 
     for i in range(5):
         for j in range(5):
-            if board[i][j] == -player and is_surrounded(board, -player, i, j, {}, 0):
+            if board[i][j] == -player and is_surrounded(board, -player, i, j, set(), 0):
                 board[i][j] = player
                 score += 1
 
@@ -226,7 +231,7 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
                 print("deadline reached")
                 return evaluate_board(board, player_id)
 
-            new_board, s = apply_move_ganh(board, move, current_player)
+            new_board, s = apply_move(board, move, current_player)
             eval_score = minimax(new_board, depth - 1, alpha, beta, False, player_id, time_mark) + s*5
             max_eval = max(max_eval, eval_score)
             alpha = max(alpha, eval_score)
@@ -240,7 +245,7 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_id, time_mark):
                 print("deadline reached")
                 return evaluate_board(board, player_id)
 
-            new_board, s = apply_move_ganh(board, move, current_player)
+            new_board, s = apply_move(board, move, current_player)
             eval_score = minimax(new_board, depth - 1, alpha, beta, True, player_id, time_mark) + s*5
             min_eval = min(min_eval, eval_score)
             beta = min(beta, eval_score)
@@ -259,7 +264,8 @@ def move(board, player, remain_time):
 
     if not valid_moves:
         return None
-    valid_moves.sort(key=lambda m: apply_move(board, m, player)[1], reverse=True)
+    valid_moves.sort(key=lambda m: apply_move_ganh(board, m, player)[1], reverse=True)
+
     if len(valid_moves) == 1:
         return valid_moves[0]
 
@@ -274,17 +280,64 @@ def move(board, player, remain_time):
     # max_depth = 5
 
     time_mark = time.time()
-    for depth in range(1, 10):
-        for move in valid_moves:
-            new_board, s = apply_move(board, move, player)
-            score = minimax(new_board, depth - 1, float('-inf'), float('inf'), False, player, time_mark)
+    # for depth in range(1, 10):
+    #     for move in valid_moves[:10]:
+    #         new_board, s = apply_move(board, move, player)
+    #         # print("\n=== DEBUG MOVE ===")
+    #         # print("Player:", player)
+    #         # print("Valid moves:", len(valid_moves))
+    #         score = minimax(new_board, depth - 1, float('-inf'), float('inf'), False, player, time_mark)
             
+    #         if score > best_score:
+    #             best_score = score
+    #             best_move = move
+
+    #         if time.time() >= time_mark + 2.9:
+    #             return best_move
+    
+    
+    # # for depth in range(1, 10):
+    # #     # print(f"\n--- DEPTH {depth} ---")
+
+    # #     for move in valid_moves[:10]:
+    # #         new_board, s = apply_move(board, move, player)
+
+    # #         score = minimax(new_board, depth - 1, float('-inf'), float('inf'), False, player, time_mark)
+
+    # #         # print(f"Move {move} | gain={s} | score={score}")
+
+    # #         if score > best_score:
+    # #             best_score = score
+    # #             best_move = move
+    # #             # print(">>> NEW BEST:", best_move, best_score)
+
+    # #         if time.time() >= time_mark + 2.9:
+    # #             # print("TIME CUT")
+    # #             # print("CHOSEN:", best_move, best_score)
+    # #             return best_move
+    for depth in range(1, 6):  # giảm depth max xuống 5
+        print(f"\n--- DEPTH {depth} ---")
+
+        for move in valid_moves[:5]:  # chỉ xét top 5 moves
+            if time.time() >= time_mark + 2.7:  # cắt sớm hơn
+                print("TIME CUT")
+                return best_move
+
+            new_board, s = apply_move(board, move, player)
+
+            score = minimax(new_board, depth - 1, float('-inf'), float('inf'), False, player, time_mark)
+
+            print(f"Move {move} | gain={s} | score={score}")
+
             if score > best_score:
                 best_score = score
                 best_move = move
+                print(">>> NEW BEST:", best_move, best_score)
 
-            if time.time() >= time_mark + 2.9:
-                return best_move
+
+
+
+
     # for current_move in valid_moves:
     #     new_board, s = apply_move(board, current_move, player)
 
